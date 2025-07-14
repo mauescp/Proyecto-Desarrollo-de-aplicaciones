@@ -1,0 +1,37 @@
+name: appgestion
+description: "A new Flutter project."
+publish_to: 'none' 
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=2.19.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  shared_preferences: ^2.2.0
+  provider: ^6.0.5
+  cupertino_icons: ^1.0.8
+  google_maps_flutter: ^2.5.0
+  geolocator: ^11.0.0
+  intl: 0.20.2  # ← Corregido con ^ para versiones compatibles
+  sqflite: ^2.0.0+3
+  path: ^1.8.0
+  path_provider: ^2.0.14
+  pdf: ^3.10.4
+  open_file: ^3.3.2
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/lang/
