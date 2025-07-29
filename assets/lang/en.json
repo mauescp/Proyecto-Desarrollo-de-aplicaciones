@@ -89,5 +89,6 @@
   "generating_report": "Generating report...",
   "report_generated": "Report generated on",
   "report_generated_success": "Report generated successfully",
-  "report_error": "Error generating report"
+  "report_error": "Error generating report",
+  "weather": "Weather"
 }

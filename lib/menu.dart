@@ -9,6 +9,7 @@ import 'sensores_screen.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/language_provider.dart';
 import 'providers/productos_provider.dart';
+import 'providers/weather_provider.dart';
 import 'widgets/language_switch_button.dart';
 import 'dart:math';
 
@@ -24,8 +25,9 @@ class _HomeScreenState extends State<HomeScreen> {
     Future.microtask(() {
       try {
         Provider.of<ProductosProvider>(context, listen: false).cargarProductos();
+        Provider.of<WeatherProvider>(context, listen: false).fetchWeatherData();
       } catch (e) {
-        print('Error al cargar productos: \$e');
+        print('Error al cargar datos: $e');
       }
     });
   }
@@ -187,14 +189,22 @@ class DashboardBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     final productosProvider = Provider.of<ProductosProvider>(context);
+    final weatherProvider = Provider.of<WeatherProvider>(context);
 
     final humedadActual = (random.nextDouble() * 100).toStringAsFixed(1);
     final temperaturaActual = (15 + random.nextDouble() * 15).toStringAsFixed(1);
     final luzActual = (random.nextDouble() * 100).toStringAsFixed(1);
 
+    if (weatherProvider.weatherData == null) {
+      Future.microtask(() => weatherProvider.fetchWeatherData());
+    }
+
     return RefreshIndicator(
       onRefresh: () async {
-        await productosProvider.cargarProductos();
+        await Future.wait([
+          productosProvider.cargarProductos(),
+          weatherProvider.fetchWeatherData(),
+        ]);
       },
       child: SingleChildScrollView(
         physics: AlwaysScrollableScrollPhysics(),
@@ -229,6 +239,79 @@ class DashboardBody extends StatelessWidget {
               ),
             ),
             SizedBox(height: 24),
+            Consumer<WeatherProvider>(
+              builder: (context, weatherProvider, child) {
+                if (weatherProvider.weatherData == null) {
+                  return Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  );
+                }
+                return Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              localizations.translate("weather"),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Image.network(
+                              'https://openweathermap.org/img/wn/${weatherProvider.weatherData!.iconCode}@2x.png',
+                              width: 50,
+                              height: 50,
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${weatherProvider.weatherData!.temperature.toStringAsFixed(1)}°C',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  weatherProvider.weatherData!.description,
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              '${weatherProvider.weatherData!.humidity}% ${localizations.translate("humidity")}',
+                              style: TextStyle(
+                                color: Colors.blue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            SizedBox(height: 16),
             _buildSummaryCard(
               context,
               localizations.translate("inventory_summary"),
@@ -278,18 +361,42 @@ class DashboardBody extends StatelessWidget {
               crossAxisSpacing: 12,
               childAspectRatio: 1.5,
               children: [
-                _buildQuickAccessButton(context, localizations.translate("add_product"), Icons.add_circle_outline, Colors.indigo, () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => InventarioScreen()));
-                }),
-                _buildQuickAccessButton(context, localizations.translate("check_sensors"), Icons.sensors, Colors.green, () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => SensoresScreen()));
-                }),
-                _buildQuickAccessButton(context, localizations.translate("view_reports"), Icons.bar_chart, Colors.amber[700]!, () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => ReportesScreen()));
-                }),
-                _buildQuickAccessButton(context, localizations.translate("tracking"), Icons.location_on, Colors.red, () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => SeguimientoScreen()));
-                }),
+                _buildQuickAccessButton(
+                  context,
+                  localizations.translate("add_product"),
+                  Icons.add_circle_outline,
+                  Colors.indigo,
+                  () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => InventarioScreen()));
+                  },
+                ),
+                _buildQuickAccessButton(
+                  context,
+                  localizations.translate("check_sensors"),
+                  Icons.sensors,
+                  Colors.green,
+                  () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => SensoresScreen()));
+                  },
+                ),
+                _buildQuickAccessButton(
+                  context,
+                  localizations.translate("view_reports"),
+                  Icons.bar_chart,
+                  Colors.amber[700]!,
+                  () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => ReportesScreen()));
+                  },
+                ),
+                _buildQuickAccessButton(
+                  context,
+                  localizations.translate("tracking"),
+                  Icons.location_on,
+                  Colors.red,
+                  () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => SeguimientoScreen()));
+                  },
+                ),
               ],
             ),
           ],
@@ -403,12 +510,12 @@ class DashboardBody extends StatelessWidget {
             ),
             Divider(height: 24),
             ...activities.map((activity) => _buildActivityItem(
-              context,
-              activity['description'] as String,
-              activity['time'] as String,
-              activity['icon'] as IconData,
-              activity['color'] as Color,
-            )),
+                  context,
+                  activity['description'] as String,
+                  activity['time'] as String,
+                  activity['icon'] as IconData,
+                  activity['color'] as Color,
+                )),
           ],
         ),
       ),
@@ -416,14 +523,32 @@ class DashboardBody extends StatelessWidget {
   }
 
   Widget _buildQuickAccessButton(BuildContext context, String label, IconData icon, Color color, VoidCallback onTap) {
-    return ElevatedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, color: Colors.white),
-      label: Text(label, style: TextStyle(color: Colors.white, fontSize: 21)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: EdgeInsets.symmetric(vertical: 16),
+    return Card(
+      elevation: 4,
+      color: color,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 32),
+              SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

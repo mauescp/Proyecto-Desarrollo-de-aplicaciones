@@ -89,5 +89,6 @@
   "generating_report": "Generando informe...",
   "report_generated": "Informe generado el",
   "report_generated_success": "Informe generado con éxito",
-  "report_error": "Error al generar el informe"
+  "report_error": "Error al generar el informe",
+  "weather": "Clima"
 }

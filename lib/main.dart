@@ -5,11 +5,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/productos_provider.dart';
 import 'providers/language_provider.dart';
+import 'providers/weather_provider.dart';
 void main() => runApp(
   MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (_) => ProductosProvider()),
       ChangeNotifierProvider(create: (_) => LanguageProvider()),
+      ChangeNotifierProvider(create: (_) => WeatherProvider()),
       // Aquí puedes añadir más providers si los necesitas
     ],
     child: LoginApp(),
