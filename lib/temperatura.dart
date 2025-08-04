@@ -1,6 +1,8 @@
-import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
+import 'services/bluetooth_manager.dart';
+import 'l10n/app_localizations.dart';
+import 'models/sensor_reading.dart';
+import 'screens/bluetooth_config_screen.dart';
 
 class TemperatureScreen extends StatefulWidget {
   @override
@@ -8,94 +10,159 @@ class TemperatureScreen extends StatefulWidget {
 }
 
 class _TemperatureScreenState extends State<TemperatureScreen> {
-  double temperature = 0.0;
-  late Timer _timer;
-
+  final BluetoothManager _bluetoothManager = BluetoothManager();
+  double currentTemperature = 0.0;
+  List<SensorReading> readings = [];
+  bool isConnected = false;
   @override
   void initState() {
     super.initState();
-    _generateTemperature();
-    _timer = Timer.periodic(Duration(seconds: 30), (timer) {
-      _generateTemperature();
+    _setupBluetoothListener();
+  }
+
+  void _setupBluetoothListener() {
+    _bluetoothManager.dataStream.listen((data) {
+      setState(() {
+        currentTemperature = data['temperature'] ?? 0.0;
+        _addReading();
+      });
     });
   }
 
-  @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
-
-  void _generateTemperature() {
+  void _addReading() {
+    final reading = SensorReading(
+      sensorType: 'temperature',
+      value: currentTemperature,
+      unit: '°C',
+      timestamp: DateTime.now(),
+    );
+    
     setState(() {
-      temperature = Random().nextDouble() * 40;
+      readings.add(reading);
+      if (readings.length > 100) { // Mantener solo las últimas 100 lecturas
+        readings.removeAt(0);
+      }
     });
-  }
-
-  String getTemperatureStatus() {
-    if (temperature < 10) {
-      return "Frío";
-    } else if (temperature < 25) {
-      return "Templado";
-    } else {
-      return "Caluroso";
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Temperatura'),
-        centerTitle: true,
-        backgroundColor: Colors.redAccent,
+        title: Text(localizations.translate("temperature_sensor")),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.bluetooth),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => BluetoothConfigScreen()),
+              );
+            },
+          ),
+        ],
       ),
-      body: Container(
+      body: Column(
+        children: [
+          _buildTemperatureDisplay(context),
+          _buildReadingsHistory(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTemperatureDisplay(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(20),
+      child: Column(
+        children: [
+          Icon(
+            Icons.thermostat,
+            size: 80,
+            color: _getTemperatureColor(),
+          ),
+          SizedBox(height: 20),
+          Text(
+            '${currentTemperature.toStringAsFixed(1)}°C',
+            style: TextStyle(
+              fontSize: 48,
+              fontWeight: FontWeight.bold,
+              color: _getTemperatureColor(),
+            ),
+          ),
+          Text(
+            _getTemperatureStatus(context),
+            style: TextStyle(fontSize: 20),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadingsHistory(BuildContext context) {
+    return Expanded(
+      child: Container(
+        margin: EdgeInsets.all(10),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.red.shade100, Colors.orange.shade300],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(10),
         ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.thermostat,
-                size: 100,
-                color: Colors.red,
+        child: ListView.builder(
+          itemCount: readings.length,
+          itemBuilder: (context, index) {
+            final reading = readings[readings.length - 1 - index];
+            return ListTile(
+              leading: Icon(Icons.thermostat),
+              title: Text('${reading.value.toStringAsFixed(1)}°C'),
+              subtitle: Text(_formatDateTime(reading.timestamp)),
+              trailing: Icon(
+                _getTemperatureIcon(reading.value),
+                color: _getTemperatureColorForValue(reading.value),
               ),
-              SizedBox(height: 20),
-              Text(
-                '${temperature.toStringAsFixed(2)} °C',
-                style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 10),
-              Text(
-                getTemperatureStatus(),
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w500, color: Colors.black54),
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _generateTemperature,
-                style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                  backgroundColor: Colors.deepOrange,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: Text(
-                  'Actualizar',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
+  }
+
+  Color _getTemperatureColor() {
+    if (currentTemperature < 18) return Colors.blue;
+    if (currentTemperature > 30) return Colors.red;
+    return Colors.green;
+  }
+
+  String _getTemperatureStatus(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    if (currentTemperature < 18) {
+      return localizations.translate("low_temperature");
+    } else if (currentTemperature > 30) {
+      return localizations.translate("high_temperature");
+    }
+    return localizations.translate("normal_temperature");
+  }
+
+  IconData _getTemperatureIcon(double temp) {
+    if (temp < 18) return Icons.ac_unit;
+    if (temp > 30) return Icons.whatshot;
+    return Icons.thermostat;
+  }
+
+  Color _getTemperatureColorForValue(double temp) {
+    if (temp < 18) return Colors.blue;
+    if (temp > 30) return Colors.red;
+    return Colors.green;
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute}';
+  }
+
+  @override
+  void dispose() {
+    _bluetoothManager.disconnect();
+    super.dispose();
   }
 }

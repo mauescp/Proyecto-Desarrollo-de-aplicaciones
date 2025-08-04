@@ -1,48 +1,62 @@
-import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
+import 'services/bluetooth_manager.dart';
 import 'l10n/app_localizations.dart';
-import 'widgets/language_switch_button.dart';
-
+import 'models/sensor_reading.dart';
+import 'screens/bluetooth_config_screen.dart';
 class SensorHumedadScreen extends StatefulWidget {
   @override
   _SensorHumedadScreenState createState() => _SensorHumedadScreenState();
 }
 
 class _SensorHumedadScreenState extends State<SensorHumedadScreen> {
-  double humidity = 0.0;
-  late Timer _timer;
-
+  final BluetoothManager _bluetoothManager = BluetoothManager();
+  double currentHumidity = 0.0;
+  List<SensorReading> readings = [];
   @override
   void initState() {
     super.initState();
-    _generateHumidityValue();
-    _timer = Timer.periodic(Duration(seconds: 30), (timer) {
-      _generateHumidityValue();
+    _setupBluetoothListener();
+  }
+
+  void _setupBluetoothListener() {
+    _bluetoothManager.dataStream.listen((data) {
+      setState(() {
+        currentHumidity = data['humidity'] ?? 0.0;
+        _addReading();
+      });
     });
   }
 
-  @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
-
-  void _generateHumidityValue() {
+  void _addReading() {
+    final reading = SensorReading(
+      sensorType: 'humidity',
+      value: currentHumidity,
+      unit: '%',
+      timestamp: DateTime.now(),
+    );
+    
     setState(() {
-      humidity = Random().nextDouble() * 100;
+      readings.add(reading);
+      if (readings.length > 100) {
+        readings.removeAt(0);
+      }
     });
   }
 
-  String getHumidityStatus(BuildContext context) {
+  Color _getHumidityColor() {
+    if (currentHumidity < 30) return Colors.orange;
+    if (currentHumidity > 70) return Colors.blue;
+    return Colors.green;
+  }
+
+  String _getHumidityStatus(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    if (humidity < 30) {
+    if (currentHumidity < 30) {
       return localizations.translate("dry_environment");
-    } else if (humidity < 70) {
-      return localizations.translate("moderate_humidity");
-    } else {
+    } else if (currentHumidity > 70) {
       return localizations.translate("humid_environment");
     }
+    return localizations.translate("moderate_humidity");
   }
 
   @override
@@ -52,58 +66,117 @@ class _SensorHumedadScreenState extends State<SensorHumedadScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(localizations.translate("humidity_sensor")),
-        centerTitle: true,
         backgroundColor: Colors.blue.shade700,
         actions: [
-          LanguageSwitchButton(),
+          IconButton(
+            icon: Icon(Icons.bluetooth),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => BluetoothConfigScreen()),
+              );
+            },
+          ),
         ],
       ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.blue.shade100, Colors.blue.shade400],
+            colors: [Colors.blue.shade100, Colors.blue.shade300],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.water_drop,
-                size: 100,
-                color: Colors.blue.shade800,
-              ),
-              SizedBox(height: 20),
-              Text(
-                '${humidity.toStringAsFixed(2)}%',
-                style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 10),
-              Text(
-                getHumidityStatus(context),
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w500, color: Colors.black54),
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _generateHumidityValue,
-                style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                  backgroundColor: Colors.blue.shade700,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: Text(
-                  localizations.translate("update"),
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
+        child: Column(
+          children: [
+            _buildHumidityDisplay(),
+            _buildReadingsHistory(context),
+          ],
         ),
       ),
     );
+  }
+
+  Widget _buildHumidityDisplay() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.water_drop,
+            size: 80,
+            color: _getHumidityColor(),
+          ),
+          SizedBox(height: 20),
+          Text(
+            '${currentHumidity.toStringAsFixed(1)}%',
+            style: TextStyle(
+              fontSize: 48,
+              fontWeight: FontWeight.bold,
+              color: _getHumidityColor(),
+            ),
+          ),
+          Text(
+            _getHumidityStatus(context),
+            style: TextStyle(fontSize: 20),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadingsHistory(BuildContext context) {
+    return Expanded(
+      child: Container(
+        margin: EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.all(8),
+              child: Text(
+                AppLocalizations.of(context).translate("recent_readings"),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: readings.length,
+                itemBuilder: (context, index) {
+                  final reading = readings[readings.length - 1 - index];
+                  return ListTile(
+                    leading: Icon(Icons.water_drop),
+                    title: Text('${reading.value.toStringAsFixed(1)}%'),
+                    subtitle: Text(_formatDateTime(reading.timestamp)),
+                    trailing: Icon(
+                      Icons.circle,
+                      color: reading.isInNormalRange() ? Colors.green : Colors.orange,
+                      size: 12,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute}';
+  }
+
+  @override
+  void dispose() {
+    _bluetoothManager.disconnect();
+    super.dispose();
   }
 }
