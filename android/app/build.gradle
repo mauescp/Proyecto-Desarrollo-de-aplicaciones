@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace "com.example.appgestion"
+    namespace "com.mau.RIM_Logistic"
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.example.appgestion"
+        applicationId "com.mau.RIM_Logistic"
         minSdk 21
         targetSdk 34
         versionCode 1
