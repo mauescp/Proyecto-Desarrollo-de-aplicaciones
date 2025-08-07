@@ -48,4 +48,5 @@ class Producto {
       fecha: fecha ?? this.fecha,
     );
   }
+  
 }
