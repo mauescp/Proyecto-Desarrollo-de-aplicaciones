@@ -10,7 +10,9 @@ import 'l10n/app_localizations.dart';
 import 'providers/language_provider.dart';
 import 'providers/productos_provider.dart';
 import 'providers/weather_provider.dart';
+import 'providers/holidays_provider.dart';
 import 'widgets/language_switch_button.dart';
+import 'widgets/holidays_card.dart';
 import 'dart:math';
 
 class HomeScreen extends StatefulWidget {
@@ -26,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
       try {
         Provider.of<ProductosProvider>(context, listen: false).cargarProductos();
         Provider.of<WeatherProvider>(context, listen: false).fetchWeatherData();
+        Provider.of<HolidaysProvider>(context, listen: false).fetchHolidays();
       } catch (e) {
         print('Error al cargar datos: $e');
       }
@@ -204,6 +207,7 @@ class DashboardBody extends StatelessWidget {
         await Future.wait([
           productosProvider.cargarProductos(),
           weatherProvider.fetchWeatherData(),
+          Provider.of<HolidaysProvider>(context, listen: false).fetchHolidays(),
         ]);
       },
       child: SingleChildScrollView(
@@ -305,6 +309,89 @@ class DashboardBody extends StatelessWidget {
                             ),
                           ],
                         ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            SizedBox(height: 16),
+            Consumer<HolidaysProvider>(
+              builder: (context, holidaysProvider, _) {
+                if (holidaysProvider.isLoading) {
+                  return Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  );
+                }
+                return Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.calendar_today, color: Colors.indigo),
+                                SizedBox(width: 8),
+                                Text(
+                                  localizations.translate('holidays'),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.refresh, color: Colors.indigo),
+                              onPressed: () {
+                                holidaysProvider.fetchHolidays();
+                              },
+                            ),
+                          ],
+                        ),
+                        Divider(height: 24),
+                        if (holidaysProvider.error.isNotEmpty)
+                          Text(
+                            holidaysProvider.error,
+                            style: TextStyle(color: Colors.red),
+                          )
+                        else if (holidaysProvider.holidays.isEmpty)
+                          Text(localizations.translate('no_upcoming_holidays'))
+                        else
+                          Container(
+                            height: 200,
+                            child: ListView.builder(
+                              itemCount: holidaysProvider.holidays.length,
+                              itemBuilder: (context, index) {
+                                final holiday = holidaysProvider.holidays[index];
+                                return ListTile(
+                                  leading: Icon(Icons.event, color: Colors.indigo),
+                                  title: Text(
+                                    holiday.localName,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    holiday.date,
+                                    style: TextStyle(color: Colors.grey[600]),
+                                  ),
+                                  dense: true,
+                                );
+                              },
+                            ),
+                          ),
                       ],
                     ),
                   ),

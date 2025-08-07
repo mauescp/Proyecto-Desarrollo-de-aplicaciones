@@ -6,12 +6,14 @@ import 'l10n/app_localizations.dart';
 import 'providers/productos_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/weather_provider.dart';
+import 'providers/holidays_provider.dart';
 void main() => runApp(
   MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (_) => ProductosProvider()),
       ChangeNotifierProvider(create: (_) => LanguageProvider()),
       ChangeNotifierProvider(create: (_) => WeatherProvider()),
+      ChangeNotifierProvider(create: (_) => HolidaysProvider()),
       // Aquí puedes añadir más providers si los necesitas
     ],
     child: LoginApp(),
@@ -263,4 +265,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-
