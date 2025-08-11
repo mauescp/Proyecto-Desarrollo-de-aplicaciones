@@ -19,98 +19,159 @@ class BluetoothManager {
 
   Future<void> startScan() async {
     try {
-      // Verificar si el Bluetooth está encendido
-      if (await FlutterBluePlus.adapterState.first == BluetoothAdapterState.off) {
+      final adapterState = await FlutterBluePlus.adapterState.first;
+      if (adapterState != BluetoothAdapterState.on) {
         throw Exception('Bluetooth está apagado');
       }
 
-      // Detener cualquier escaneo previo
       await stopScan();
 
-      // Iniciar nuevo escaneo
-      await FlutterBluePlus.startScan(timeout: Duration(seconds: 4));
+      print('Iniciando escaneo Bluetooth...');
       
-      // Escuchar resultados del escaneo
+      // Obtener dispositivos ya conectados
+      final connectedDevices = await FlutterBluePlus.connectedSystemDevices;
+      if (connectedDevices.isNotEmpty) {
+        print('Dispositivos conectados encontrados: ${connectedDevices.length}');
+        _deviceController.add(connectedDevices);
+      }
+
+      // Iniciar escaneo
+      await FlutterBluePlus.startScan(
+        timeout: const Duration(seconds: 15),
+        androidUsesFineLocation: true,
+      );
+
+      // Suscribirse a los resultados del escaneo
       FlutterBluePlus.scanResults.listen((results) {
+        print('Resultados del escaneo: ${results.length} dispositivos');
+        
         final devices = results.map((r) => r.device).toList();
-        _deviceController.add(devices);
+        final allDevices = [...(connectedDevices), ...devices];
+        
+        // Filtrar dispositivos únicos
+        final uniqueDevices = allDevices.toSet().toList();
+        print('Dispositivos únicos encontrados: ${uniqueDevices.length}');
+        _deviceController.add(uniqueDevices);
+      }, onError: (error) {
+        print('Error en el escaneo: $error');
       });
     } catch (e) {
-      print('Error al escanear: $e');
+      print('Error al iniciar escaneo: $e');
+      throw e;
+    }
+  }
+
+  Future<void> connectToDevice(BluetoothDevice device) async {
+    try {
+      print('Iniciando conexión a: ${device.remoteId}');
+      await disconnect();
+
+      if (!device.isConnected) {
+        print('Intentando conectar...');
+        await device.connect(
+          timeout: const Duration(seconds: 30),
+          autoConnect: false,
+        ).timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            throw TimeoutException('Tiempo de conexión agotado');
+          },
+        );
+      }
+
+      _connectedDevice = device;
+      print('Dispositivo conectado, buscando servicios...');
+
+      final services = await device.discoverServices();
+      print('Servicios encontrados: ${services.length}');
+
+      // UUIDs específicos de tu dispositivo
+      const String serviceUuid = "FFE0";
+      const String characteristicUuid = "FFE1";
+
+      for (var service in services) {
+        final serviceId = service.uuid.toString().toUpperCase();
+        print('Analizando servicio: $serviceId');
+
+        if (serviceId.contains(serviceUuid)) {
+          for (var characteristic in service.characteristics) {
+            final characteristicId = characteristic.uuid.toString().toUpperCase();
+            print('Analizando característica: $characteristicId');
+
+            if (characteristicId.contains(characteristicUuid)) {
+              print('Característica encontrada, configurando...');
+              _characteristic = characteristic;
+              
+              await characteristic.setNotifyValue(true);
+              characteristic.onValueReceived.listen(
+                (value) {
+                  print('Datos recibidos: ${value.length} bytes');
+                  _processData(value);
+                },
+                onError: (error) {
+                  print('Error en notificaciones: $error');
+                },
+              );
+
+              print('Configuración completada');
+              return;
+            }
+          }
+        }
+      }
+
+      throw Exception('No se encontró la característica adecuada');
+    } catch (e) {
+      print('Error en la conexión: $e');
+        _connectedDevice = null;
+        _characteristic = null;
+      throw e;
+  }
+}
+
+  Future<void> reconnectToSystemDevice(BluetoothDevice device) async {
+    try {
+      print('Reconectando a dispositivo del sistema: ${device.remoteId}');
+      await connectToDevice(device);
+    } catch (e) {
+      print('Error en reconexión: $e');
       throw e;
     }
   }
 
   Future<void> stopScan() async {
     try {
-      await FlutterBluePlus.stopScan();
+      if (await FlutterBluePlus.isScanning.first) {
+        print('Deteniendo escaneo...');
+        await FlutterBluePlus.stopScan();
+      }
     } catch (e) {
-      print('Error al detener el escaneo: $e');
+      print('Error al detener escaneo: $e');
     }
   }
 
-  Future<void> connectToDevice(BluetoothDevice device) async {
+  void _processData(List<int> data) {
     try {
-      // Desconectar dispositivo actual si existe
-      await disconnect();
-
-      // Conectar al nuevo dispositivo
-      await device.connect(timeout: Duration(seconds: 4));
-      _connectedDevice = device;
-
-      // Descubrir servicios
-      List<BluetoothService> services = await device.discoverServices();
+      final dataString = String.fromCharCodes(data);
+      print('Datos recibidos: $dataString');
       
-      // UUID del servicio y característica de tu dispositivo Arduino
-      // Deberás reemplazar estos UUID con los de tu dispositivo
-      String serviceUuid = "FFE0"; // Ejemplo de UUID
-      String characteristicUuid = "FFE1"; // Ejemplo de UUID
-
-      for (BluetoothService service in services) {
-        if (service.uuid.toString().toUpperCase().contains(serviceUuid)) {
-          for (BluetoothCharacteristic characteristic in service.characteristics) {
-            if (characteristic.uuid.toString().toUpperCase().contains(characteristicUuid)) {
-              _characteristic = characteristic;
-
-              // Suscribirse a las notificaciones
-              await characteristic.setNotifyValue(true);
-              characteristic.onValueReceived.listen((value) {
-                _processData(value);
-              });
-              break;
-      }
+      final sensorData = <String, double>{};
+      
+      for (var part in dataString.split(',')) {
+        final keyValue = part.split(':');
+        if (keyValue.length == 2) {
+          final key = keyValue[0].trim();
+          final value = double.tryParse(keyValue[1].trim());
+          if (value != null) {
+            sensorData[key] = value;
           }
         }
       }
 
-      if (_characteristic == null) {
-        throw Exception('No se encontró la característica adecuada');
-      }
-    } catch (e) {
-      print('Error al conectar: $e');
-      _connectedDevice = null;
-      _characteristic = null;
-      throw e;
-  }
-}
-
-  void _processData(List<int> data) {
-    try {
-      // Convertir bytes a string
-      String dataString = String.fromCharCodes(data);
-      Map<String, double> sensorData = {};
-      
-      // Procesar datos en formato "temp:23.5,hum:45.2,light:500,prox:10"
-      dataString.split(',').forEach((part) {
-        var keyValue = part.split(':');
-        if (keyValue.length == 2) {
-          sensorData[keyValue[0].trim()] = double.tryParse(keyValue[1].trim()) ?? 0.0;
-    }
-      });
-
       if (sensorData.isNotEmpty) {
+        print('Datos procesados: $sensorData');
         _dataController.add(sensorData);
-  }
+      }
     } catch (e) {
       print('Error procesando datos: $e');
     }
@@ -119,19 +180,22 @@ class BluetoothManager {
   Future<void> disconnect() async {
     try {
       if (_connectedDevice != null) {
+        print('Desconectando de: ${_connectedDevice!.remoteId}');
         await _connectedDevice!.disconnect();
         _connectedDevice = null;
         _characteristic = null;
-  }
+      }
     } catch (e) {
       print('Error al desconectar: $e');
-}
+    }
   }
 
   Future<bool> isBluetoothAvailable() async {
     try {
       final state = await FlutterBluePlus.adapterState.first;
-      return state == BluetoothAdapterState.on;
+      final isOn = state == BluetoothAdapterState.on;
+      print('Estado Bluetooth: ${isOn ? 'Encendido' : 'Apagado'}');
+      return isOn;
     } catch (e) {
       print('Error verificando Bluetooth: $e');
       return false;
@@ -139,6 +203,7 @@ class BluetoothManager {
   }
 
   void dispose() {
+    print('Liberando recursos...');
     disconnect();
     _dataController.close();
     _deviceController.close();

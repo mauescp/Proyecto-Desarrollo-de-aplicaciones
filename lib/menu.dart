@@ -243,78 +243,78 @@ class DashboardBody extends StatelessWidget {
               ),
             ),
             SizedBox(height: 24),
-            Consumer<WeatherProvider>(
-              builder: (context, weatherProvider, child) {
-                if (weatherProvider.weatherData == null) {
-                  return Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                  );
-                }
-                return Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              localizations.translate("weather"),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Image.network(
-                              'https://openweathermap.org/img/wn/${weatherProvider.weatherData!.iconCode}@2x.png',
-                              width: 50,
-                              height: 50,
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${weatherProvider.weatherData!.temperature.toStringAsFixed(1)}°C',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  weatherProvider.weatherData!.description,
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Text(
-                              '${weatherProvider.weatherData!.humidity}% ${localizations.translate("humidity")}',
-                              style: TextStyle(
-                                color: Colors.blue,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+Consumer<WeatherProvider>(
+  builder: (context, weatherProvider, child) {
+    if (weatherProvider.weatherData == null) {
+      return Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  localizations.translate("weather"),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                );
-              },
+                ),
+                Image.network(
+                  'https://openweathermap.org/img/wn/${weatherProvider.weatherData!.iconCode}@2x.png',
+                  width: 50,
+                  height: 50,
+                ),
+              ],
             ),
+            SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${weatherProvider.weatherData!.temperature.toStringAsFixed(1)}°C',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      AppLocalizations.of(context).translate(weatherProvider.weatherData!.description),
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '${weatherProvider.weatherData!.humidity}% ${localizations.translate("humidity")}',
+                  style: TextStyle(
+                    color: Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  },
+),
             SizedBox(height: 16),
             Consumer<HolidaysProvider>(
               builder: (context, holidaysProvider, _) {
