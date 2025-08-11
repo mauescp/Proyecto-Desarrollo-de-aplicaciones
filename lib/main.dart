@@ -7,6 +7,7 @@ import 'providers/productos_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/weather_provider.dart';
 import 'providers/holidays_provider.dart';
+import 'providers/tracking_provider.dart'; // Importamos el nuevo provider
 void main() => runApp(
   MultiProvider(
     providers: [
@@ -14,7 +15,7 @@ void main() => runApp(
       ChangeNotifierProvider(create: (_) => LanguageProvider()),
       ChangeNotifierProvider(create: (_) => WeatherProvider()),
       ChangeNotifierProvider(create: (_) => HolidaysProvider()),
-      // Aquí puedes añadir más providers si los necesitas
+      ChangeNotifierProvider(create: (_) => TrackingProvider()), // Agregamos el nuevo provider
     ],
     child: LoginApp(),
   )

@@ -21,6 +21,9 @@
         android:label="RIM Logistics"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyBrG7qTlwl7hFuhIG7oieIskcE93vS-Rek"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"
